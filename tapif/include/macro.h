@@ -11,7 +11,6 @@
 #include <memory.h>
 #include <unistd.h> 
  
-#define MLEN 512
 #define  TCPT_NTIMERS 4
 #define IP_MAX_MEMBERSHIPS              20
 

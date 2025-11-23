@@ -1,45 +1,22 @@
-/*
- * MIT License
- *
- * Copyright (c) 2024 skaiui2
-
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
-
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *  https://github.com/skaiui2/SKRTOS_sparrow
- */
-
 #include "heap.h"
 #include <pthread.h>
 
 #define MIN_size     ((size_t) (HeapStructSize << 1))
 
-Class(heap_node){
-        heap_node *next;
-        size_t BlockSize;
+Class(heap_node)
+{
+    heap_node *next;
+    size_t BlockSize;
 };
 
-Class(xheap){
-        heap_node head;
-        heap_node *tail;
-        size_t AllSize;
+Class(xheap)
+{
+    heap_node head;
+    heap_node *tail;
+    size_t AllSize;
 };
 
-static xheap TheHeap = {
+xheap TheHeap = {
         .tail = NULL,
         .AllSize = config_heap,
 };
@@ -52,13 +29,13 @@ static const size_t HeapStructSize = (sizeof(heap_node) + (size_t)(alignment_byt
 void heap_init( void )
 {
     heap_node *first_node;
-    uint32_t start_heap ,end_heap;
-    //get start address
-    start_heap =(uint32_t) AllHeap;
+    uintptr_t start_heap ,end_heap;
+    
+    start_heap =(uintptr_t)AllHeap;
     if( (start_heap & alignment_byte) != 0){
         start_heap += alignment_byte ;
         start_heap &= ~alignment_byte;
-        TheHeap.AllSize -=  (size_t)(start_heap - (uint32_t)AllHeap);//byte alignment means move to high address,so sub it!
+        TheHeap.AllSize -=  (size_t)(start_heap - (uintptr_t)AllHeap);
     }
     TheHeap.head.next = (heap_node *)start_heap;
     TheHeap.head.BlockSize = (size_t)0;
@@ -75,7 +52,7 @@ void heap_init( void )
     first_node->BlockSize = TheHeap.AllSize;
 }
 
-void *HeapMalloc(size_t WantSize)
+void *heap_malloc1(size_t WantSize)
 {
     heap_node *prev_node;
     heap_node *use_node;
@@ -84,15 +61,15 @@ void *HeapMalloc(size_t WantSize)
     void *xReturn = NULL;
     WantSize += HeapStructSize;
     if((WantSize & alignment_byte) != 0x00) {
-        alignment_require_size = (alignment_byte + 1) - (WantSize & alignment_byte);//must 8-byte alignment
+        alignment_require_size = (alignment_byte + 1) - (WantSize & alignment_byte);
         WantSize += alignment_require_size;
-    }//You can add the TaskSuspend function ,that make here be an atomic operation
+    }
     if(TheHeap.tail== NULL ) {
         heap_init();
-    }//Resume
+    }
     prev_node = &TheHeap.head;
     use_node = TheHeap.head.next;
-    while((use_node->BlockSize) < WantSize) {//check the size is fit
+    while((use_node->BlockSize) < WantSize) {
         prev_node = use_node;
         use_node = use_node->next;
         if(use_node == NULL){
@@ -107,19 +84,19 @@ void *HeapMalloc(size_t WantSize)
         use_node->BlockSize = WantSize;
         new_node->next = prev_node->next;
         prev_node->next = new_node;
-    }//Finish cutting
+    }
     TheHeap.AllSize-= use_node->BlockSize;
     use_node->next = NULL;
     return xReturn;
 }
 
 static void InsertFreeBlock(heap_node* xInsertBlock);
-void HeapFree(void *xReturn)
+void heap_free1(void *xReturn)
 {
     heap_node *xlink;
     uint8_t *xFree = (uint8_t*)xReturn;
 
-    xFree -= HeapStructSize;//get the start address of the heap struct
+    xFree -= HeapStructSize;
     xlink = (void*)xFree;
     TheHeap.AllSize += xlink->BlockSize;
     InsertFreeBlock((heap_node*)xlink);
@@ -131,7 +108,7 @@ static void InsertFreeBlock(heap_node* xInsertBlock)
     uint8_t* getaddr;
 
     for(first_fit_node = &TheHeap.head;first_fit_node->next < xInsertBlock;first_fit_node = first_fit_node->next)
-    { /*finding the fit node*/ }
+    { }
 
     xInsertBlock->next = first_fit_node->next;
     first_fit_node->next = xInsertBlock;
@@ -154,13 +131,20 @@ static void InsertFreeBlock(heap_node* xInsertBlock)
 
 
 
+
+
 pthread_mutex_t alloc_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t free_lock = PTHREAD_MUTEX_INITIALIZER;
+
+unsigned int alloc_count = 0;
+unsigned int free_count = 0;
 
 void *heap_malloc(size_t WantSize)
 {
     pthread_mutex_lock(&alloc_lock);
     void *ret = heap_malloc1(WantSize);
+    printf("alloc is: %p\n", ret);
+    alloc_count++;
     pthread_mutex_unlock(&alloc_lock);
 
     return ret;
@@ -170,6 +154,12 @@ void *heap_malloc(size_t WantSize)
 void heap_free(void *xReturn)
 {
     pthread_mutex_lock(&free_lock);
-    heap_free1(xReturn);
+    void **ptr = (void **)xReturn;
+    if (*ptr) {
+        printf("free is: %p\n", *ptr);
+        heap_free1(*ptr);
+        *ptr = NULL; 
+    }
+    free_count++;
     pthread_mutex_unlock(&free_lock);
 }

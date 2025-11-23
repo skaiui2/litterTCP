@@ -1,11 +1,9 @@
 # litterTCP
-A lightweight TCP/IP stack with ARP, ICMP, UDP, simplified TCP, and socket APIs—built for teaching, research, and simple communication with Linux servers and clients.
+这里是教程分支，也就是study分支，主要存放教程对应的项目文件。
 
 
 
-## Note
-I am currently busy, so this project will not be updated for a while.  Bug fixes and tutorials will be added later when I have more time.
+### tapif文件夹
 
-### Contact information
+实现了tapif接口，可以往网卡里写数据并抓包验证。
 
-[skaiuijing@gmail.com](mailto:skaiuijing@gmail.com)

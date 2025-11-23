@@ -33,5 +33,6 @@
 void *heap_malloc(size_t WantSize);
 void heap_free(void *xReturn);
 
+#define auto_free __attribute__((cleanup(heap_free)))
 
 #endif
